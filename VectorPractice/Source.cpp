@@ -159,7 +159,7 @@ void CpuReq(int pid) {
 		processTable[pid].coretimes += processTable[pid].steps[0].time;
 		processTable[pid].core = 0;
 		seed.operation = processTable[pid].steps[0].operation;
-		seed.time = processTable[pid].steps[0].time;
+		seed.time = dTable[0].completionTime;
 		seed.process = pid;
 		parentQueue.push(seed);
 		processTable[pid].steps.erase(processTable[pid].steps.begin());
@@ -171,7 +171,7 @@ void CpuReq(int pid) {
 		processTable[pid].coretimes += processTable[pid].steps[0].time;
 		processTable[pid].core = 1;
 		seed.operation = processTable[pid].steps[0].operation;
-		seed.time = processTable[pid].steps[0].time;
+		seed.time = dTable[1].completionTime;
 		seed.process = pid;
 		parentQueue.push(seed);
 		processTable[pid].steps.erase(processTable[pid].steps.begin());
@@ -210,6 +210,7 @@ void CpuComp(int pid) {
 		dTable[core].completionTime = myClock + current.time;
 		processTable[pid].coretimes += current.time;
 		processTable[pid].core = core;
+		current.time = dTable[core].completionTime;
 		parentQueue.push(current);
 	}
 	else {
@@ -218,6 +219,7 @@ void CpuComp(int pid) {
 		dTable[core].completionTime = myClock + current.time;
 		processTable[pid].coretimes += current.time;
 		processTable[pid].core = core;
+		current.time = dTable[core].completionTime;
 		parentQueue.push(current);
 	}
 	getReq(pid);
@@ -230,7 +232,7 @@ void DiskReq(int pid) {
 		dTable[2].busy = true;
 		dTable[2].completionTime = myClock + processTable[pid].steps[0].time;
 		seed.operation = processTable[pid].steps[0].operation;
-		seed.time = processTable[pid].steps[0].time;
+		seed.time = dTable[2].completionTime;
 		seed.process = pid;
 		parentQueue.push(seed);
 		processTable[pid].steps.erase(processTable[pid].steps.begin());
@@ -245,7 +247,17 @@ void DiskReq(int pid) {
 };
 
 void DiskComp(int pid) {
-	processTable[pid].steps.erase(processTable[pid].steps.begin());
+	myClock = dTable[2].completionTime;
+	if (diskQueue.empty()) {
+		dTable[2].busy = false;
+	}
+	else {
+		current = diskQueue.front();
+		dTable[2].completionTime = myClock + current.time;
+		current.time = dTable[2].completionTime;
+		parentQueue.push(current);
+	}
+	processTable[pid].priority = 'l';
 	getReq(pid);
 };
 
