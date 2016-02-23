@@ -5,7 +5,19 @@
 #include <queue>
 
 using namespace std;
-int clock = 0;
+
+//declare variables, hopefully the names are self explanatory
+//Globals are bad practice, but this program is small enough in scope that they help more than hurt
+
+int myClock = 0;
+Event seed; //Used to start the event queue
+vector<Event> dataTable;
+vector<Process> processTable;
+queue<Event> highPriority;
+queue<Event> lowPriority;
+priority_queue<Event, vector<Event>, CompareStarts> parentQueue;
+
+
 
 //Defines an event as, for example, operation = CORE, time = 800, process 0
 class Event {
@@ -34,7 +46,7 @@ public:
 	int busytime;
 	char priority;
 	vector<Event> steps;
-	string processTable;
+	string state;
 	string IOComp;
 };
 
@@ -101,19 +113,36 @@ public:
 	}
 };
 
-void StartReq(Process process, int number) {
-	
+void getReq(int pid) {
+	if (processTable[pid].steps.size() == empty) {
+		processTable[pid].state = "TERMINATED";
+	}
+	else {
+		if (processTable[pid].steps.begin().operation == "CORE") {
+			CpuReq(pid);
+		}
+		else if (processTable[pid].steps.begin().operation == "DISK") {
+			DiskReq(pid);
+		}
+		else
+			IOReq(pid);
+	}
+	processTable[pid].steps.erase(processTable[pid].steps.begin());
 };
 
-void CpuReq() {
+void StartReq(int pid) {
+	getReq(pid);
+};
+
+void CpuReq(int pid) {
 
 };
 
-void DiskReq() {
+void DiskReq(int pid) {
 
 };
 
-void IOReq() {
+void IOReq(int pid) {
 
 };
 
@@ -121,13 +150,7 @@ void IOReq() {
 int main() {
 	cout << "Hello, World!" << endl;
 	
-	//declare variables, hopefully the names are self explanatory
-	Event seed; //Used to start the event queue
-	vector<Event> dataTable; 
-	vector<Process> processTable;
-	queue<Event> highPriority;
-	queue<Event> lowPriority;
-	priority_queue<Event, vector<Event>, CompareStarts> parentQueue;
+	
 
 	//build initial tables
 	readInput(dataTable);
@@ -150,7 +173,7 @@ int main() {
 	/*while (!parentQueue.empty()) {
 		Event current = parentQueue.top();
 		if (current.operation == "Start") {
-			clock = current.time;
+			myClock = current.time;
 			StartReq(current.process)
 		}
 	}*/
