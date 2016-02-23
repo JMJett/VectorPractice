@@ -20,7 +20,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <Text Include="..\..\..\..\OSys\input13.txt">
+    <Text Include="F:\Matt\School Notes and Homework\Spring 2016\Operating Systems\Assignment 1\input13.txt">
       <Filter>Resource Files</Filter>
     </Text>
   </ItemGroup>

@@ -6,19 +6,6 @@
 
 using namespace std;
 
-//declare variables, hopefully the names are self explanatory
-//Globals are bad practice, but this program is small enough in scope that they help more than hurt
-
-int myClock = 0;
-Event seed; //Used to start the event queue
-vector<Event> dataTable;
-vector<Process> processTable;
-queue<Event> highPriority;
-queue<Event> lowPriority;
-priority_queue<Event, vector<Event>, CompareStarts> parentQueue;
-
-
-
 //Defines an event as, for example, operation = CORE, time = 800, process 0
 class Event {
 public:
@@ -44,6 +31,7 @@ public:
 	int currentLine;
 	int coretimes;
 	int busytime;
+	int core;
 	char priority;
 	vector<Event> steps;
 	string state;
@@ -57,6 +45,42 @@ public:
 	int process;
 	int completionTime;
 };
+
+//Following a method I found to define how the priority queue sorts user-defined objects
+class CompareStarts {
+public:
+	bool operator()(Event event1, Event event2)
+	{
+		if (event2.time < event1.time) return true;
+		return false;
+	}
+};
+
+//Function prototypes
+void readInput(std::vector<Event> & event);
+void buildProcessTable(vector<Event> & event, vector<Process> & process);
+void getReq(int pid);
+void CpuReq(int pid);
+void DiskReq(int pid);
+void IOReq(int pid);
+void CpuComp(int pid);
+void DiskComp(int pid);
+void IOComp(int pid);
+void PrintTable();
+
+//declare variables, hopefully the names are self explanatory
+//Globals are bad practice, but this program is small enough in scope that they help more than hurt
+
+int myClock = 0;
+Event seed; //Used to start the event queue
+Event current;
+vector<Event> dataTable;
+vector<Process> processTable;
+queue<Event> highPriority;
+queue<Event> lowPriority;
+queue<Event> diskQueue;
+priority_queue<Event, vector<Event>, CompareStarts> parentQueue;
+Device dTable[4]; //0 = Core0, 1 = Core1, 2 = Disk, 3 = IO
 
 //Use input redirection to read the input file into a table of events
 void readInput(std::vector<Event> & event) {
@@ -103,48 +127,143 @@ void buildProcessTable(vector<Event> & event, vector<Process> & process) {
 	}
 }
 
-//Following a template I found to define how the priority queue sorts user-defined objects
-class CompareStarts {
-public:
-	bool operator()(Event event1, Event event2)
-	{
-		if (event2.time < event1.time) return true;
-		return false;
-	}
-};
+
 
 void getReq(int pid) {
-	if (processTable[pid].steps.size() == empty) {
+	if (processTable[pid].steps.size() == 0) {
 		processTable[pid].state = "TERMINATED";
+		PrintTable();
 	}
 	else {
-		if (processTable[pid].steps.begin().operation == "CORE") {
+		if (processTable[pid].steps[0].operation == "CORE") {
 			CpuReq(pid);
 		}
-		else if (processTable[pid].steps.begin().operation == "DISK") {
+		else if (processTable[pid].steps[0].operation == "DISK") {
 			DiskReq(pid);
 		}
 		else
 			IOReq(pid);
 	}
-	processTable[pid].steps.erase(processTable[pid].steps.begin());
+	
 };
 
 void StartReq(int pid) {
+	processTable[pid].priority = 'h';
 	getReq(pid);
 };
 
 void CpuReq(int pid) {
+	if (!dTable[0].busy) {
+		dTable[0].busy = true;
+		dTable[0].completionTime = myClock + processTable[pid].steps[0].time;
+		processTable[pid].coretimes += processTable[pid].steps[0].time;
+		processTable[pid].core = 0;
+		seed.operation = processTable[pid].steps[0].operation;
+		seed.time = processTable[pid].steps[0].time;
+		seed.process = pid;
+		parentQueue.push(seed);
+		processTable[pid].steps.erase(processTable[pid].steps.begin());
 
+	}
+	else if (!dTable[1].busy) {
+		dTable[1].busy = true;
+		dTable[1].completionTime = myClock + processTable[pid].steps[0].time;
+		processTable[pid].coretimes += processTable[pid].steps[0].time;
+		processTable[pid].core = 1;
+		seed.operation = processTable[pid].steps[0].operation;
+		seed.time = processTable[pid].steps[0].time;
+		seed.process = pid;
+		parentQueue.push(seed);
+		processTable[pid].steps.erase(processTable[pid].steps.begin());
+	}
+	else {
+		if (processTable[pid].priority == 'h') {
+			seed.operation = processTable[pid].steps[0].operation;
+			seed.time = processTable[pid].steps[0].time;
+			seed.process = pid;
+			highPriority.push(seed);
+			processTable[pid].steps.erase(processTable[pid].steps.begin());
+
+		}
+		else {
+			seed.operation = processTable[pid].steps[0].operation;
+			seed.time = processTable[pid].steps[0].time;
+			seed.process = pid;
+			lowPriority.push(seed);
+			processTable[pid].steps.erase(processTable[pid].steps.begin());
+
+		}
+	}
+	
+};
+
+void CpuComp(int pid) {
+	int core = processTable[pid].core;
+	myClock = dTable[core].completionTime;
+	if (highPriority.empty() && lowPriority.empty())
+	{
+		dTable[core].busy = false;
+	}
+	else if (highPriority.empty()){
+		current = lowPriority.front();
+		lowPriority.pop();
+		dTable[core].completionTime = myClock + current.time;
+		processTable[pid].coretimes += current.time;
+		processTable[pid].core = core;
+		parentQueue.push(current);
+	}
+	else {
+		current = highPriority.front();
+		highPriority.pop();
+		dTable[core].completionTime = myClock + current.time;
+		processTable[pid].coretimes += current.time;
+		processTable[pid].core = core;
+		parentQueue.push(current);
+	}
+	getReq(pid);
 };
 
 void DiskReq(int pid) {
+	if (processTable[pid].steps[0].time == 0)
+		processTable[pid].priority = 'l';
+	if (!dTable[2].busy) {
+		dTable[2].busy = true;
+		dTable[2].completionTime = myClock + processTable[pid].steps[0].time;
+		seed.operation = processTable[pid].steps[0].operation;
+		seed.time = processTable[pid].steps[0].time;
+		seed.process = pid;
+		parentQueue.push(seed);
+		processTable[pid].steps.erase(processTable[pid].steps.begin());
+	}
+	else {
+		seed.operation = processTable[pid].steps[0].operation;
+		seed.time = processTable[pid].steps[0].time;
+		seed.process = pid;
+		diskQueue.push(seed);
+		processTable[pid].steps.erase(processTable[pid].steps.begin());
+	}
+};
 
+void DiskComp(int pid) {
+	processTable[pid].steps.erase(processTable[pid].steps.begin());
+	getReq(pid);
 };
 
 void IOReq(int pid) {
 
 };
+
+
+void IOComp(int pid) {
+	processTable[pid].steps.erase(processTable[pid].steps.begin());
+	getReq(pid);
+};
+
+void PrintTable() {
+
+};
+
+
 
 
 int main() {
@@ -171,11 +290,21 @@ int main() {
 	}
 
 	/*while (!parentQueue.empty()) {
-		Event current = parentQueue.top();
+		current = parentQueue.top();
+		int pid = current.process;
+		parentQueue.pop();
 		if (current.operation == "Start") {
 			myClock = current.time;
-			StartReq(current.process)
+			StartReq(pid);
 		}
+		else if(current.operation == "CORE") {
+			CpuComp(pid);
+		}
+		else if (current.operation == "DISK") {
+			DiskComp(pid);
+		}
+		else
+			IOComp(pid);
 	}*/
 
 
