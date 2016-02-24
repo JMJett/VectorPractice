@@ -66,7 +66,7 @@ void IOReq(int pid);
 void CpuComp(int pid);
 void DiskComp(int pid);
 void IOComp(int pid);
-void PrintTable();
+void PrintTable(int pid);
 
 //declare variables, hopefully the names are self explanatory
 //Globals are bad practice, but this program is small enough in scope that they help more than hurt
@@ -122,6 +122,7 @@ void buildProcessTable(vector<Event> & event, vector<Process> & process) {
 		for (int j = process[i].firstLine + 1; j < process[i].lastLine; j++) {
 			step.operation = event[j].operation;
 			step.time = event[j].time;
+			step.process = i;
 			process[i].steps.push_back(step);
 		}
 	}
@@ -130,9 +131,9 @@ void buildProcessTable(vector<Event> & event, vector<Process> & process) {
 
 
 void getReq(int pid) {
-	if (processTable[pid].steps.size() == 0) {
+	if (processTable[pid].steps.empty()) {
 		processTable[pid].state = "TERMINATED";
-		PrintTable();
+		PrintTable(pid);
 	}
 	else {
 		if (processTable[pid].steps[0].operation == "CORE") {
@@ -143,7 +144,7 @@ void getReq(int pid) {
 		}
 		else
 			IOReq(pid);
-	}
+}
 	
 };
 
@@ -262,17 +263,27 @@ void DiskComp(int pid) {
 };
 
 void IOReq(int pid) {
-
+	dTable[3].busy = true;
+	dTable[3].completionTime = myClock + processTable[pid].steps[0].time;
+	seed.operation = processTable[pid].steps[0].operation;
+	seed.time = dTable[3].completionTime;
+	seed.process = pid;
+	parentQueue.push(seed);
+	processTable[pid].steps.erase(processTable[pid].steps.begin());
 };
 
 
 void IOComp(int pid) {
-	processTable[pid].steps.erase(processTable[pid].steps.begin());
+	myClock = dTable[3].completionTime;
+	dTable[3].busy = false;
+	processTable[pid].priority = 'h';
 	getReq(pid);
 };
 
-void PrintTable() {
-
+void PrintTable(int pid) {
+	cout << "Process ID: " << pid << endl << "Operation: " << current.operation
+		<< endl << "Core time: " << processTable[pid].coretimes << endl
+		<< "Status: " << processTable[pid].state << endl << endl;
 };
 
 
@@ -295,13 +306,13 @@ int main() {
 		parentQueue.push(seed);
 	}
 	
-	while (!parentQueue.empty()) {
+	/*while (!parentQueue.empty()) {
 		Event w = parentQueue.top();
 		cout << w.operation << " " << w.time << " Process #: " << w.process << endl;
 		parentQueue.pop();
-	}
+	}*/
 
-	/*while (!parentQueue.empty()) {
+	while (!parentQueue.empty()) {
 		current = parentQueue.top();
 		int pid = current.process;
 		parentQueue.pop();
@@ -317,7 +328,7 @@ int main() {
 		}
 		else
 			IOComp(pid);
-	}*/
+	}
 
 
 	cout << endl << endl << endl;
